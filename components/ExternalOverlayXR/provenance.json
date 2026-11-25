@@ -1,0 +1,16 @@
+{
+  "version": "0.1.0",
+  "origin": "AC7 0.8.3-r2 / GitHub v0.8.3",
+  "nativeFiles": {
+    "CMakeLists.txt": "95b7cd9f75ccac81c1d7a9be023e4ed18f70c0a2cb5efea6fb046c521ee37ec4",
+    "HoldGesture.h": "4fcabe27c0945c2ebc102dd8b13b43e8d7e58276b5dbfb7942d4817db6afd67d",
+    "OpenXRLayer.cpp": "39b55e27a9ba73dbaca7987e83efffd547d0f2a3b04d1c11d1c582a37f8a5596",
+    "Surface.h": "d5187e9b36a7d19eebc61acb8136093cc37212e5787b7c439fa800eb321b08a6",
+    "XrInformation.h": "9de8ff41c71a3349a047a5ab32944db890003b346a0e8ca434f3b530d1e9033e",
+    "XrResolution.h": "9f37284386d52c4680ec6ee8d7160424c2350ec8d10102292ab7d8426c120009"
+  },
+  "acceptedLayerSHA256": "4351d18574e1eac52dc352d45296c311d936a19c78b6b628824ab1bdf724ecb7",
+  "hostExtraction": "make_server and imports retained; AC7 PipeTransport and CLI removed; widgets/surface/renderer unchanged",
+  "testsExtraction": "XrSmoke AC7 keyboard/UEVR fixture removed; shared layer checks retained",
+  "physicalAcceptance": "AC7 user reported successful flight on 2026-10-05; no other-game or headset certification"
+}

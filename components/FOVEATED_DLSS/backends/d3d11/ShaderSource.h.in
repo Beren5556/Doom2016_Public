@@ -1,0 +1,4 @@
+#pragma once
+namespace dlss_foveado::d3d11 {
+inline constexpr char ShaderSource[] = R"FOV_SHADER(@DLSS_FOVEADO_SHADER_TEXT@)FOV_SHADER";
+}

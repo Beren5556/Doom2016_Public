@@ -1,0 +1,10 @@
+{
+  "version": "1.1-dev1-public",
+  "distribution": "portable compiled ZIP",
+  "base": "KHARVOX 1.11, internal 1.1.1",
+  "engineSha256": "a4574ce185abf53952e5eae1bdff23ad276096d29e0176ba6c08a15d1fe1d9e1",
+  "userSuppliedOptionalRuntimes": [
+    "nvngx_dlssnr.dll",
+    "bhaptics_library.dll"
+  ]
+}

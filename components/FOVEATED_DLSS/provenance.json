@@ -1,0 +1,28 @@
+{
+  "engine": "DLSS_FOVEADO",
+  "engine_version": "1.3.0",
+  "public_contract_version": 4,
+  "configuration_schema": 3,
+  "configuration_read_schemas": [
+    1,
+    2,
+    3
+  ],
+  "control_contract_version": 2,
+  "baseline_commit": "7e8327b6dc91b987781e6ed47243a57d1d1327cc",
+  "implementation": "Own implementation; no Cheeky source incorporated",
+  "behavioral_reference": {
+    "project": "Cheeky Foveated DLSS",
+    "version": "0.5.5",
+    "commit": "4e47eefe51a512dcaf76bbdc672dcdab5251fc71",
+    "checked_on": "2026-10-11"
+  },
+  "current_host": "Reusable engine; B3 0.9.9 accepted changes adopted, no reintegration or universal hardware claim",
+  "tracking_scope": "Fixed center, fixed or opt-in Dynamic bounds; no eye tracking",
+  "geometry": "Fixed common binocular contour with four independent cuts and host-supplied overlapping projections; legacy schema 1/2 retains original image-space geometry until explicit Apply",
+  "update_policy": "Reviewed changes, explicit capability/schema evolution, exact-candidate validation; no automatic upstream source import",
+  "experimental_extension_version": 1,
+  "adoption_receipt": "evidence/adoption-b3-0.9.9/adoption.json",
+  "consumer_policy_version": 1,
+  "neural_integration_contract_version": 1
+}

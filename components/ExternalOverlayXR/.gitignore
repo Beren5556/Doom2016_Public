@@ -1,0 +1,13 @@
+/build*/
+/dist/
+/test-output/
+**/__pycache__/
+*.pyc
+*.dll
+*.exe
+*.pdb
+*.obj
+*.zip
+
+/.venv/
+/node_modules/

@@ -1,0 +1,226 @@
+{
+  "version": "0.1.1",
+  "date": "2026-10-07",
+  "result": "PASS",
+  "scope": "Common layer and local integration kit only; no AC7 migration, live installation, game, VR, FPS measurement or publication",
+  "baseCommit": "25fba663cabd6d19671bfae083da4ea32c4d0e96",
+  "sourceBranch": "codex/layer-0.1.1-no-ofxr",
+  "artifact": {
+    "zip": "dist/ExternalOverlayXR-0.1.1.zip",
+    "zipSHA256": "7544538e3f8cb977167f96589c634ccfb44bc7fd715caaf56995fb109ccca111",
+    "zipBytes": 60971,
+    "dllSHA256": "da4bc917d12ad01e3d869e4492cba6104288178b24d6982919ac0667406fd885",
+    "dllVersion": "0.1.1",
+    "manifestImplementation": 2,
+    "surfaceABI": 1
+  },
+  "tools": {
+    "compiler": "MSVC 19.44.35228.0 x64 /W4 /WX",
+    "WindowsSDK": "10.0.26100.0",
+    "python": "3.12.14",
+    "Pillow": "12.3.0",
+    "Node": "24.19.0",
+    "Playwright": "1.62.1",
+    "Edge": "154.0.4258.62"
+  },
+  "native": {
+    "cases": [
+      {
+        "name": "xr-d3d11",
+        "result": "PASS",
+        "seconds": 17.0146
+      },
+      {
+        "name": "xr-d3d12",
+        "result": "PASS",
+        "seconds": 5.25718
+      },
+      {
+        "name": "xr-index",
+        "result": "PASS",
+        "seconds": 5.21037
+      },
+      {
+        "name": "xr-vive",
+        "result": "PASS",
+        "seconds": 5.29618
+      },
+      {
+        "name": "xr-pico",
+        "result": "PASS",
+        "seconds": 5.20786
+      },
+      {
+        "name": "xr-plus",
+        "result": "PASS",
+        "seconds": 5.20466
+      },
+      {
+        "name": "xr-motion",
+        "result": "PASS",
+        "seconds": 5.21001
+      },
+      {
+        "name": "xr-no-extensions",
+        "result": "PASS",
+        "seconds": 5.20823
+      },
+      {
+        "name": "xr-core11",
+        "result": "PASS",
+        "seconds": 5.20133
+      }
+    ],
+    "standaloneNativeBuild": "PASS; not substituted for the tested distribution DLL",
+    "fixtureSHA256": "e063ad0f9ec02268d1a2b8160ea01572bf2b641326e2feed985c4b9223fadaa1",
+    "imports": [
+      "KERNEL32.dll",
+      "MSVCP140.dll",
+      "VCRUNTIME140.dll",
+      "VCRUNTIME140_1.dll",
+      "api-ms-win-crt-runtime-l1-1-0.dll",
+      "api-ms-win-crt-string-l1-1-0.dll",
+      "api-ms-win-crt-math-l1-1-0.dll",
+      "api-ms-win-crt-heap-l1-1-0.dll"
+    ],
+    "exports": [
+      "xrNegotiateLoaderApiLayerInterface"
+    ],
+    "functionalNativeSourceUnchanged": true
+  },
+  "hostUI": {
+    "result": "PASS",
+    "command": "python tests/test_demo.py",
+    "coverage": [
+      "loopback authentication",
+      "actual Edge browser",
+      "common resolution widget and +/-50",
+      "Log navigation",
+      "Apply acknowledgement",
+      "Discard",
+      "no browser page errors"
+    ],
+    "runtimeDependencies": "Pinned versions from the existing development runtime; no personal browser profile",
+    "equivalence": "Delivered host/examples match tested source bytes"
+  },
+  "audit": {
+    "operationalSourceFiles": 29,
+    "deliveryFiles": 26,
+    "freshZipExtraction": "PASS",
+    "exactTestedDLL": "PASS",
+    "negativeCases": [
+      {
+        "case": "NVIDIA_DLSS_OFXR.dll",
+        "result": "rejected",
+        "reason": "Excluded provider marker 'ofxr' in NVIDIA_DLSS_OFXR.dll"
+      },
+      {
+        "case": "NVIDIA_DLSS_OFXR_DJULES75.dll",
+        "result": "rejected",
+        "reason": "Excluded provider marker 'ofxr' in NVIDIA_DLSS_OFXR_DJULES75.dll"
+      },
+      {
+        "case": "settings.ini",
+        "result": "rejected",
+        "reason": "Excluded provider marker 'ofxr' in settings.ini"
+      },
+      {
+        "case": "old-loader.bin",
+        "result": "rejected",
+        "reason": "Excluded provider marker 'ofxr' in old-loader.bin"
+      },
+      {
+        "case": "old-exports.bin",
+        "result": "rejected",
+        "reason": "Excluded provider marker 'rtw77' in old-exports.bin"
+      },
+      {
+        "case": "old-bridge.bin",
+        "result": "rejected",
+        "reason": "Excluded provider marker 'xrframebridge' in old-bridge.bin"
+      },
+      {
+        "case": "extra provider in extracted kit",
+        "result": "rejected",
+        "reason": "Unexpected delivery entry: NVIDIA_DLSS_OFXR_DJULES75.dll"
+      }
+    ],
+    "sourceSHA256": {
+      "CMakeLists.txt": "9bf9f0e7b11efaba7ada89e8b338665fadd7bcba9fcac5a114b716a06d8882b2",
+      "VERSION": "80447316529fc62014fbaa047fb67c51ac30e32830cda370405349d8d66d196c",
+      "ExternalOverlayXR.json": "0d3a97352bd63e7bf132911f66d5094993ce77a58d037c2bc8e7788b79cc1d29",
+      "package.json": "3e02d195f19c6b1eb96fa64b816fc2685227ccd2de3765b513b736cfd61d4a1f",
+      "requirements.txt": "31864229d2dd8a2c4feddb7cc04e989ea6643d88158090384a80f69f951052a8",
+      "native/CMakeLists.txt": "0e888f3c57158f37e4ffb7ff234184c47c30a9ff7317740fd43edc3901da043e",
+      "native/HoldGesture.h": "4fcabe27c0945c2ebc102dd8b13b43e8d7e58276b5dbfb7942d4817db6afd67d",
+      "native/OpenXRLayer.cpp": "23b84cdfca5c3f6ed8d3a267066e8d77765ca15a08122352d314657429b2a5bf",
+      "native/Surface.h": "d5187e9b36a7d19eebc61acb8136093cc37212e5787b7c439fa800eb321b08a6",
+      "native/Version.rc.in": "5c9e75c1c40b9e6bcda43c5520d9751e3e9aadf0e0552458c0a11da692991dac",
+      "native/XrInformation.h": "9de8ff41c71a3349a047a5ab32944db890003b346a0e8ca434f3b530d1e9033e",
+      "native/XrResolution.h": "9f37284386d52c4680ec6ee8d7160424c2350ec8d10102292ab7d8426c120009",
+      "host/child_job.py": "50394b4afe4f022a8465c7f6eca96d17c26ef9ffaa48a28ec1fe82f5390646c9",
+      "host/host.py": "160041d134c6687612ba4722ad344d6c8859a6b31530ee23846982766b060f91",
+      "host/render_surface.cjs": "9fbe9c6c59696b4b58fc3ca8f9d3b5781c4e1dfc9184ef0c4a032fa76ac8a76d",
+      "host/surface.py": "4b72026023070feb9d2ab8a33a590b6e74716e4f93bf7261608888d1e9d8a568",
+      "host/web/information.js": "db153d91a51e7a77be9634abe8f41b4b802225dd8284f87843be0458a772d364",
+      "host/web/navigation.js": "86d59fee8be3ec4a41b5707d9ffdb3c2ecb1b9b50fbd4d74bb4223070fd788c8",
+      "host/web/resolution.js": "b4339c449eb2148f52a74233cf479f0e39ecedcedc3494438acc32cff2396ab4",
+      "examples/demo_host.py": "5088291a08ce5bc9a312604b0382963157f2a062a2c944554f6af335976c2ffd",
+      "examples/web/adapter.js": "443e9c69ad2ddab66c9697682d60eba74ab53a7fd86016863da69e7103bca9e6",
+      "examples/web/index.html": "d1324dc6b7a650b2ff97ac8eb961976c804c407faf47f4aa3ff3f2ba0f39c18a",
+      "third_party/openxr/LICENSES/Apache-2.0.txt": "406e740a1c88320a2812cd3dae908abdcbe1044b1d6393a90e8c6ef229bd4cf2",
+      "third_party/openxr/LICENSES/MIT.txt": "0459805ebfeff6e7cbe7a1913fe79e75ad192965dcfebceac11ec4c233acf53c",
+      "third_party/openxr/include/openxr/openxr.h": "75ae85f7b1308d33572908342d1f3bf6d26a57769cc2092aa3163dfeaf1dcbed",
+      "third_party/openxr/include/openxr/openxr_loader_negotiation.h": "6cea662d58721ad77712bcdbc5620426d8c6e509abf92af75c9ed28b8df9dd98",
+      "third_party/openxr/include/openxr/openxr_platform.h": "150939f39aaf1159e9f59ab53b5d5863c08d5777efa13820b5cbcd3562eb068d",
+      "third_party/openxr/include/openxr/openxr_platform_defines.h": "7dc30ad27f1082a71f84f5f5adf10762558fc9fe57fdc7628d796d22be3b0dbe",
+      "scripts/package_release.py": "202587727b60d81f7e9d26447c983bde86718196ff7f23f2363c0789d2833614"
+    },
+    "deliverySHA256": {
+      "ExternalOverlayXR.dll": "da4bc917d12ad01e3d869e4492cba6104288178b24d6982919ac0667406fd885",
+      "ExternalOverlayXR.json": "0d3a97352bd63e7bf132911f66d5094993ce77a58d037c2bc8e7788b79cc1d29",
+      "LICENSE": "ef10b0b9fbacefcfa477a07b053e0dd4f374cc10f2b301181beb13113044f5b7",
+      "package.json": "3e02d195f19c6b1eb96fa64b816fc2685227ccd2de3765b513b736cfd61d4a1f",
+      "README.md": "693a9661976897ac8b8caca77268941348dfe29eb41921bdf745cc5dfcb8a07a",
+      "requirements.txt": "31864229d2dd8a2c4feddb7cc04e989ea6643d88158090384a80f69f951052a8",
+      "THIRD_PARTY.md": "cf4f6480f3f5345e9be5006c7cd41a670cbb8b19a0fe97fafb4b01505c7faa74",
+      "VERSION": "80447316529fc62014fbaa047fb67c51ac30e32830cda370405349d8d66d196c",
+      "docs/ADAPTER_API.md": "99df28ea2d2c2323234032d146f32702bcf9f0f7e2edb77e133f0767dbd5ae36",
+      "docs/FIRST_INSTALL_AND_BOOTSTRAP.md": "025cf74166956e51d9ff56ce393c1f97702bca2fb9d7c4dea689e9a60c23a6db",
+      "docs/INTEGRATING_A_CONSUMER.md": "43b8ec7c7f879c6fa5db87fba2151c0c52837e3defb53c2caa367721127e2395",
+      "docs/SURFACE_ABI.md": "33a44f7054da0f089163ec521543fb7482742369fee1aa8d7040f3f0d53b9d23",
+      "examples/demo_host.py": "5088291a08ce5bc9a312604b0382963157f2a062a2c944554f6af335976c2ffd",
+      "host/child_job.py": "50394b4afe4f022a8465c7f6eca96d17c26ef9ffaa48a28ec1fe82f5390646c9",
+      "host/host.py": "160041d134c6687612ba4722ad344d6c8859a6b31530ee23846982766b060f91",
+      "host/render_surface.cjs": "9fbe9c6c59696b4b58fc3ca8f9d3b5781c4e1dfc9184ef0c4a032fa76ac8a76d",
+      "host/surface.py": "4b72026023070feb9d2ab8a33a590b6e74716e4f93bf7261608888d1e9d8a568",
+      "docs/validation/first-install-20261005.json": "6c86db45840ed859bf2a668df01ce3ff66f830d5225cef64b354d6968f887c26",
+      "examples/web/adapter.js": "443e9c69ad2ddab66c9697682d60eba74ab53a7fd86016863da69e7103bca9e6",
+      "examples/web/index.html": "d1324dc6b7a650b2ff97ac8eb961976c804c407faf47f4aa3ff3f2ba0f39c18a",
+      "host/web/information.js": "db153d91a51e7a77be9634abe8f41b4b802225dd8284f87843be0458a772d364",
+      "host/web/navigation.js": "86d59fee8be3ec4a41b5707d9ffdb3c2ecb1b9b50fbd4d74bb4223070fd788c8",
+      "host/web/resolution.js": "b4339c449eb2148f52a74233cf479f0e39ecedcedc3494438acc32cff2396ab4",
+      "licenses/OpenXR/Apache-2.0.txt": "406e740a1c88320a2812cd3dae908abdcbe1044b1d6393a90e8c6ef229bd4cf2",
+      "licenses/OpenXR/MIT.txt": "0459805ebfeff6e7cbe7a1913fe79e75ad192965dcfebceac11ec4c233acf53c"
+    },
+    "unchangedABIHostAndFixture": [
+      "host/child_job.py",
+      "host/host.py",
+      "host/render_surface.cjs",
+      "host/surface.py",
+      "host/web/information.js",
+      "host/web/navigation.js",
+      "host/web/resolution.js",
+      "examples/demo_host.py",
+      "examples/web/adapter.js",
+      "examples/web/index.html",
+      "native/Surface.h",
+      "native/XrInformation.h",
+      "native/XrResolution.h",
+      "native/HoldGesture.h",
+      "tests/XrSmoke.cpp"
+    ]
+  },
+  "physicalAcceptance": "Pending for this artifact in each consumer; origin acceptance is not inherited",
+  "remoteState": "Not pushed; main and v0.1.0 preserved"
+}

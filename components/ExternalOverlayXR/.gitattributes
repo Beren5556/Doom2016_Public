@@ -1,0 +1,3 @@
+# Preserve provenance hashes exactly, including original source line endings.
+native/** -text
+host/** -text

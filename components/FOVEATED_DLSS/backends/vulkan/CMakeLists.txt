@@ -1,0 +1,21 @@
+set(DLSS_FOVEADO_VULKAN_INCLUDE "" CACHE PATH "Vulkan headers directory")
+set(DLSS_FOVEADO_GLSLANG "" CACHE FILEPATH "Pinned glslang executable")
+if(NOT EXISTS "${DLSS_FOVEADO_VULKAN_INCLUDE}/vulkan/vulkan.h" OR NOT EXISTS "${DLSS_FOVEADO_GLSLANG}")
+  message(FATAL_ERROR "Vulkan pilot requires explicit headers and glslang")
+endif()
+set(headers)
+foreach(format rgba16f rgba32f rg32f r32f)
+  set(header "${CMAKE_CURRENT_BINARY_DIR}/${format}.h")
+  add_custom_command(OUTPUT "${header}"
+    COMMAND "${DLSS_FOVEADO_GLSLANG}" -V --target-env vulkan1.1 -DOUTPUT_FORMAT=${format}
+      --vn shader_${format} "${PROJECT_SOURCE_DIR}/shaders/Operations.comp" -o "${header}"
+    DEPENDS "${PROJECT_SOURCE_DIR}/shaders/Operations.comp" VERBATIM)
+  list(APPEND headers "${header}")
+endforeach()
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/VulkanShaders.h" "#include <cstdint>\n#include \"rgba16f.h\"\n#include \"rgba32f.h\"\n#include \"rg32f.h\"\n#include \"r32f.h\"\n")
+add_library(dlss_foveado_vulkan STATIC Operations.cpp ${headers})
+add_library(dlss_foveado::vulkan ALIAS dlss_foveado_vulkan)
+target_link_libraries(dlss_foveado_vulkan PUBLIC dlss_foveado_core)
+target_compile_definitions(dlss_foveado_vulkan PUBLIC VK_NO_PROTOTYPES)
+target_include_directories(dlss_foveado_vulkan PUBLIC "${DLSS_FOVEADO_VULKAN_INCLUDE}" PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+target_compile_features(dlss_foveado_vulkan PUBLIC cxx_std_20)

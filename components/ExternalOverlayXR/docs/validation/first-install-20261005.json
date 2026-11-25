@@ -1,0 +1,39 @@
+{
+  "result": "PASS",
+  "checkedAtUtc": "2026-10-05T17:37:11.121718+00:00",
+  "consumer": "AC7 0.8.4 full public profile",
+  "archiveSHA256": "e001fb56f358c74868c4b28d0ee0e40b4c303023c46173a7d726ce155b2f5d54",
+  "bridgeSHA256": "da140e14f1977d5be1b3e17e7ed9fa544aaa7896a43ca38b625ba98608083ca3",
+  "layerSHA256": "4351d18574e1eac52dc352d45296c311d936a19c78b6b628824ab1bdf724ecb7",
+  "manifestBeforeDllLoad": true,
+  "layerBeforeDllLoad": true,
+  "profileExistedBeforeExtraction": false,
+  "cases": [
+    {
+      "name": "publishedZipFirstLoad",
+      "exitCode": 0,
+      "observed": "layer active; existing other layers preserved"
+    },
+    {
+      "name": "missing",
+      "exitCode": 0,
+      "observed": "layer inactive; existing other layers preserved"
+    },
+    {
+      "name": "late",
+      "exitCode": 0,
+      "observed": "layer inactive; existing other layers preserved"
+    },
+    {
+      "name": "firstPluginInitialize",
+      "exitCode": 0,
+      "observed": "plugin initialized; duplicate rejected; fake host launched once"
+    }
+  ],
+  "scope": "Real published bridge DLL loaded in fresh process and empty isolated profile; host initialization uses a fake host. No real OpenXR instance, game, VR or Edge started. Does not certify BL3 or every target PC.",
+  "realProfileModified": false,
+  "releaseAssetsModified": false,
+  "moduleNativeCodeModified": false,
+  "note": "Sanitized result summary; no personal paths, raw logs, binaries, credentials or profile files. This evidence concerns AC7 packaging, not a BL3 reproduction or a new module-native test run.",
+  "probeSourceSha256": "9beae944ab390fc6a7d69aa8f06caa9d1a5d264b78fba3e3ac769e4ce98e2ec2"
+}

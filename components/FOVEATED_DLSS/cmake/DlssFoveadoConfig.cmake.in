@@ -1,0 +1,13 @@
+@PACKAGE_INIT@
+if(@DLSS_FOVEADO_WITH_NGX@ AND NOT TARGET DlssFoveado::NgxSdk)
+  # A new consumer supplies its own SDK path; no development-PC path is used.
+  if(NOT DLSS_FOVEADO_NGX_SDK)
+    message(FATAL_ERROR "Set DLSS_FOVEADO_NGX_SDK to your own NVIDIA NGX SDK")
+  endif()
+  find_library(DLSS_FOVEADO_NGX_LIBRARY nvsdk_ngx_d
+    PATHS "${DLSS_FOVEADO_NGX_SDK}/lib/Windows_x86_64/x64" NO_DEFAULT_PATH REQUIRED)
+  add_library(DlssFoveado::NgxSdk UNKNOWN IMPORTED)
+  set_target_properties(DlssFoveado::NgxSdk PROPERTIES IMPORTED_LOCATION "${DLSS_FOVEADO_NGX_LIBRARY}")
+endif()
+include("${CMAKE_CURRENT_LIST_DIR}/DlssFoveadoTargets.cmake")
+check_required_components(DlssFoveado)

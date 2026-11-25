@@ -1,0 +1,8 @@
+{
+  "name": "external-overlay-xr-host",
+  "version": "0.1.1",
+  "private": true,
+  "dependencies": {
+    "playwright": "1.62.1"
+  }
+}

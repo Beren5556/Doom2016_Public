@@ -1,0 +1,31 @@
+#include "../src/sfs/ShaderCompiler.h"
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+int main(int argc,char** argv){try{
+    if(argc<3){std::cerr<<"Usage: KharvoxSfsCompile source.spv output.spv [projection|profile|profile-shadow|mono|temporal-guides|temporal-audit|temporal-resolve|geometry-audit|geometry-audit-profile] [ui]\n";return 2;}
+    const auto size=std::filesystem::file_size(argv[1]);if(size<20||size%4||size>16*1024*1024)throw std::runtime_error("Invalid input size");
+    std::vector<uint32_t> words(size/4);std::ifstream input(argv[1],std::ios::binary);
+    if(!input.read(reinterpret_cast<char*>(words.data()),size))throw std::runtime_error("Read failed");
+    const std::string mode=argc>3?argv[3]:"";
+    const bool profile=mode=="profile"||mode=="profile-texture-feedback"||mode=="profile-shadow"||mode=="temporal-guides"||mode=="temporal-audit"||mode=="temporal-resolve"||mode=="geometry-audit-profile";
+    kharvox::sfs::ShaderCompileOptions options;options.vertexProjection=kharvox::sfs::needsHeadsetProjection(words,profile,mode=="profile-shadow")||mode=="projection";
+    options.computeStereo=kharvox::sfs::hasStereoStorageOutput(words);
+    options.profileReplacement=profile;
+    options.temporalGuides=mode=="temporal-guides";
+    options.temporalAudit=mode=="temporal-audit";
+    options.geometryAudit=mode=="geometry-audit"||mode=="geometry-audit-profile";
+    options.temporalResolve=mode=="temporal-resolve";
+    options.finalSceneCopy=mode=="final-copy";
+    options.finalSceneResolve=mode=="final-resolve";
+    options.textureFeedback=mode=="texture-feedback"||mode=="profile-texture-feedback";
+    options.screenSpaceUi=argc>4&&std::string(argv[4])=="ui";
+    options.monoscopicView=argc>3&&std::string(argv[3])=="mono";
+    if(options.monoscopicView)options.computeStereo=false;
+    if(profile)options.computeStereo=false;
+    auto result=kharvox::sfs::compileStereoShader(words,options);
+    std::ofstream output(argv[2],std::ios::binary);output.write(reinterpret_cast<const char*>(result.words.data()),result.words.size()*4);
+    if(!output)throw std::runtime_error("Write failed");
+    std::ofstream source(std::string(argv[2])+".glsl");source<<result.glsl;
+    std::cout<<result.arrayBindings.size()<<" promoted descriptor bindings; bounded texture feedback="<<result.textureFeedbackCorrections<<"\n";return 0;
+}catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}

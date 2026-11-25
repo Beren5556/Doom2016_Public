@@ -1,0 +1,7 @@
+{
+  "b3Tag": "v0.9.11",
+  "b3Commit": "55b20f77c9816669de171ae4907c249ddc51ed6f",
+  "overlayVulkanCommit": "efa1649",
+  "scope": "B3 original generic adapter, styles, graphics, foveation and log; no game-controls injection; DOOM live engine/XR control and output-resolution receipts",
+  "b3IndexSha256": "ac13400ca730acb9af36f44cc0580d65a5d25c27b7a2fdd08d049aae20e1955c"
+}

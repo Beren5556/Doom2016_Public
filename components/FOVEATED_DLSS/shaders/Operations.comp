@@ -1,0 +1,60 @@
+#version 450
+// Neural residual/detail/color resolve adapted from the host-supplied B3
+// Neural integration kit, Copyright (c) 2026 xen, MIT. See
+// backends/vulkan/RESIDUAL-LICENSE.txt. Other module code retains its license.
+layout(local_size_x=8,local_size_y=8) in;
+layout(set=0,binding=0,std140) uniform Parameters {
+    vec4 sourceRect;vec4 sizes;vec4 crop;vec4 centerHalf;vec4 options;
+    vec4 componentScale;vec4 commonX;vec4 commonY;vec4 commonW;vec4 radii;
+} p;
+layout(set=0,binding=1) uniform sampler2D source0;
+layout(set=0,binding=2) uniform sampler2D source1;
+layout(set=0,binding=3,OUTPUT_FORMAT) writeonly uniform image2D target;
+layout(set=0,binding=4) uniform sampler2D source2;
+float distanceToRegion(vec2 position) {
+    if(p.commonX.w>.5){vec3 v=vec3(position,1);vec2 d=vec2(dot(p.commonX.xyz,v),dot(p.commonY.xyz,v))/dot(p.commonW.xyz,v)-.5;
+        vec2 radius=vec2(d.x<0?p.radii.w:p.radii.z,d.y<0?p.radii.x:p.radii.y);vec2 q=abs(d)/radius;
+        return (p.options.x>.5?length(q):max(q.x,q.y))-1;}
+    vec2 q=abs(position-p.centerHalf.xy);
+    return p.options.x>.5?(length(q/p.centerHalf.zw)-1)*min(p.centerHalf.z,p.centerHalf.w):max(q.x-p.centerHalf.z,q.y-p.centerHalf.w);
+}
+vec3 decode(vec3 c){return mix(pow(max((c+.055)/1.055,vec3(0)),vec3(2.4)),c/12.92,lessThanEqual(c,vec3(.04045)));}
+vec3 encode(vec3 c){return mix(1.055*pow(max(c,vec3(0)),vec3(1./2.4))-.055,c*12.92,lessThanEqual(c,vec3(.0031308)));}
+vec3 sharpen(vec3 result,vec3 original,vec2 uv,float strength){
+    const vec3 luma=vec3(.2126,.7152,.0722);vec2 texel=1./vec2(textureSize(source0,0));
+    vec3 e=textureLod(source0,uv+vec2(texel.x,0),0).rgb,w=textureLod(source0,uv-vec2(texel.x,0),0).rgb;
+    vec3 n=textureLod(source0,uv-vec2(0,texel.y),0).rgb,s=textureLod(source0,uv+vec2(0,texel.y),0).rgb;
+    float lo=min(dot(original,luma),min(min(dot(e,luma),dot(w,luma)),min(dot(n,luma),dot(s,luma))));
+    float hi=max(dot(original,luma),max(max(dot(e,luma),dot(w,luma)),max(dot(n,luma),dot(s,luma))));
+    float adaptive=clamp(1.-(hi-lo)/(hi+.0001),0.,1.);
+    return max(result+(original-(e+w+n+s)*.25)*strength*(.2+.8*adaptive),vec3(0));
+}
+void main(){ivec2 pixel=ivec2(gl_GlobalInvocationID.xy);if(any(greaterThanEqual(pixel,ivec2(p.sizes.zw))))return;vec2 position=vec2(pixel)+.5;vec4 value;
+    if(p.componentScale.w>3.5){
+        value=textureLod(source0,position/p.sizes.zw,0);float d=distanceToRegion(position);
+        float width=p.commonX.w>.5?2./max(p.sizes.z,p.sizes.w):2.;
+        float line=1.-smoothstep(width,width*2.,abs(d));value.rgb=mix(value.rgb,p.options.z>.5?vec3(.2,.65,1):vec3(.2,1,.4),line*.9);
+    }else if(p.componentScale.w>2.5){
+        vec2 uv=position/p.sizes.zw;value=textureLod(source0,uv,0);value.rgb=sharpen(value.rgb,value.rgb,uv,p.options.x);
+    }else if(p.componentScale.w>1.5){
+        // Matched residual from the B3 Neural proxy: retain native detail and
+        // transfer only the model edit, then apply contrast-adaptive sharpening.
+        vec2 uv=position/p.sizes.zw;value=textureLod(source0,uv,0);vec3 original=value.rgb;
+        vec3 small=textureLod(source1,uv,0).rgb,model=textureLod(source2,uv,0).rgb;
+        const vec3 luma=vec3(.2126,.7152,.0722);vec3 edit=model-small;float editLuma=dot(edit,luma);
+        vec3 result=max(original+(vec3(editLuma)+(edit-vec3(editLuma))*p.options.y)*p.options.x,vec3(0));
+        float il=dot(max(small,vec3(0)),luma),ol=dot(max(original,vec3(0)),luma),ml=dot(max(model,vec3(0)),luma),rl=dot(result,luma);
+        float limit=max(ol*2.5,ol*((ml+1./512.)/(il+1./512.))*1.5+.1);
+        if(rl>limit&&il>.00001)result*=limit/rl;
+        value.rgb=sharpen(result,original,uv,p.options.z);
+    }else if(p.componentScale.w<.5){
+        vec2 at=clamp(p.sourceRect.xy+position/p.sizes.zw*p.sourceRect.zw,p.sourceRect.xy+.5,p.sourceRect.xy+p.sourceRect.zw-.5);
+        value=p.options.x>.5?texelFetch(source0,ivec2(at),0):textureLod(source0,at/p.sizes.xy,0);value.xy*=p.componentScale.xy;
+    }else{
+        vec4 base=textureLod(source0,position/p.sizes.zw,0);vec2 region=position*p.componentScale.xy;float d=distanceToRegion(region);
+        float t=p.options.y>0?clamp(d/p.options.y,0,1):(d>0?1:0);float weight=1-t*t*(3-2*t);
+        if(weight<=0)value=base;else{vec4 detail=textureLod(source1,region*p.crop.xy+p.crop.zw,0);
+            if(weight>=1)value=detail;else{vec3 rgb=p.options.z>.5?encode(mix(decode(base.rgb),decode(detail.rgb),weight)):mix(base.rgb,detail.rgb,weight);value=vec4(rgb,mix(base.a,detail.a,weight));}}
+    }
+    imageStore(target,pixel,value);
+}

@@ -1,0 +1,76 @@
+{
+  "version": "0.1.1",
+  "date": "2026-10-07",
+  "result": "PASS",
+  "releaseRepository": "Beren5556/ExternalOverlayXR",
+  "privateOnly": true,
+  "tag": "v0.1.1",
+  "releaseURL": "https://github.com/Beren5556/ExternalOverlayXR/releases/tag/v0.1.1",
+  "authorization": "Carlos explicitly accepted the version and ordered private GitHub publication with updated documentation",
+  "artifact": {
+    "name": "ExternalOverlayXR-0.1.1.zip",
+    "zipSHA256": "4e2523026b8e9ae27b05d3ec805968e949fcfcfed76aab55fef157963d1a429d",
+    "zipBytes": 61419,
+    "checksumAsset": "ExternalOverlayXR-0.1.1.sha256",
+    "dllSHA256": "da4bc917d12ad01e3d869e4492cba6104288178b24d6982919ac0667406fd885",
+    "dllVersion": "0.1.1",
+    "manifestImplementation": 2,
+    "surfaceABI": 1
+  },
+  "documentationRevision": 2,
+  "initialKitSHA256": "7544538e3f8cb977167f96589c634ccfb44bc7fd715caaf56995fb109ccca111",
+  "reusedTests": {
+    "nativeCases": 9,
+    "hostUI": "PASS",
+    "negativeCases": 7,
+    "reason": "The tested DLL, operational sources, host, fixture and dependency pins are unchanged; this release changes delivery documentation only",
+    "originalReceipt": "release-0.1.1.json"
+  },
+  "newChecks": {
+    "operationalSourceAudit": 29,
+    "deliveryFileAudit": 26,
+    "freshZipExtraction": "PASS",
+    "testedDLLHashEquality": "PASS",
+    "changedDeliveryFiles": [
+      "README.md",
+      "docs/INTEGRATING_A_CONSUMER.md"
+    ],
+    "deliverySHA256": {
+      "ExternalOverlayXR.dll": "da4bc917d12ad01e3d869e4492cba6104288178b24d6982919ac0667406fd885",
+      "ExternalOverlayXR.json": "0d3a97352bd63e7bf132911f66d5094993ce77a58d037c2bc8e7788b79cc1d29",
+      "LICENSE": "ef10b0b9fbacefcfa477a07b053e0dd4f374cc10f2b301181beb13113044f5b7",
+      "package.json": "3e02d195f19c6b1eb96fa64b816fc2685227ccd2de3765b513b736cfd61d4a1f",
+      "README.md": "d83e179949d63e6d25999c848b14c0abde5919e72fef6d16e990709ee90b9b2f",
+      "requirements.txt": "31864229d2dd8a2c4feddb7cc04e989ea6643d88158090384a80f69f951052a8",
+      "THIRD_PARTY.md": "cf4f6480f3f5345e9be5006c7cd41a670cbb8b19a0fe97fafb4b01505c7faa74",
+      "VERSION": "80447316529fc62014fbaa047fb67c51ac30e32830cda370405349d8d66d196c",
+      "docs/ADAPTER_API.md": "99df28ea2d2c2323234032d146f32702bcf9f0f7e2edb77e133f0767dbd5ae36",
+      "docs/FIRST_INSTALL_AND_BOOTSTRAP.md": "025cf74166956e51d9ff56ce393c1f97702bca2fb9d7c4dea689e9a60c23a6db",
+      "docs/INTEGRATING_A_CONSUMER.md": "f3c9cf4598db47b430cda1d582cb8cb42279ad56e4cf8543246abee6b574731a",
+      "docs/SURFACE_ABI.md": "33a44f7054da0f089163ec521543fb7482742369fee1aa8d7040f3f0d53b9d23",
+      "examples/demo_host.py": "5088291a08ce5bc9a312604b0382963157f2a062a2c944554f6af335976c2ffd",
+      "host/child_job.py": "50394b4afe4f022a8465c7f6eca96d17c26ef9ffaa48a28ec1fe82f5390646c9",
+      "host/host.py": "160041d134c6687612ba4722ad344d6c8859a6b31530ee23846982766b060f91",
+      "host/render_surface.cjs": "9fbe9c6c59696b4b58fc3ca8f9d3b5781c4e1dfc9184ef0c4a032fa76ac8a76d",
+      "host/surface.py": "4b72026023070feb9d2ab8a33a590b6e74716e4f93bf7261608888d1e9d8a568",
+      "docs/validation/first-install-20261005.json": "6c86db45840ed859bf2a668df01ce3ff66f830d5225cef64b354d6968f887c26",
+      "examples/web/adapter.js": "443e9c69ad2ddab66c9697682d60eba74ab53a7fd86016863da69e7103bca9e6",
+      "examples/web/index.html": "d1324dc6b7a650b2ff97ac8eb961976c804c407faf47f4aa3ff3f2ba0f39c18a",
+      "host/web/information.js": "db153d91a51e7a77be9634abe8f41b4b802225dd8284f87843be0458a772d364",
+      "host/web/navigation.js": "86d59fee8be3ec4a41b5707d9ffdb3c2ecb1b9b50fbd4d74bb4223070fd788c8",
+      "host/web/resolution.js": "b4339c449eb2148f52a74233cf479f0e39ecedcedc3494438acc32cff2396ab4",
+      "licenses/OpenXR/Apache-2.0.txt": "406e740a1c88320a2812cd3dae908abdcbe1044b1d6393a90e8c6ef229bd4cf2",
+      "licenses/OpenXR/MIT.txt": "0459805ebfeff6e7cbe7a1913fe79e75ad192965dcfebceac11ec4c233acf53c"
+    }
+  },
+  "consumerAcceptance": {
+    "consumer": "AC7 0.8.5-r2",
+    "date": "2026-10-07",
+    "type": "User report",
+    "statement": "Todo perfecto",
+    "moduleHashVerifiedInsideConsumerZIP": true,
+    "consumerZIP_SHA256": "1faa3e55748fc261a7fbc455a0040568f7412e549203d0d7d9bc5ba723c15f92",
+    "scope": "This consumer integration; no independent FPS measurement or extension to other games/headsets/nightlies"
+  },
+  "remoteVerificationReceipt": "Local-only test-output/publication-0.1.1/github-verification.json; generated after push/release/authenticated asset download"
+}

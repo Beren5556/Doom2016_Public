@@ -1,0 +1,15 @@
+{
+  "contract_version": 1,
+  "library": "ShortFuse compat-fp16-310.9.16-cuda13.4.3 patched",
+  "library_sha256": "CDFA6C1EC784867182164C7836F324F087B5C9F374D0C9FE46F54999FEABF3ED",
+  "real_filename": "nvngx_dlssnr_real.dll",
+  "proxy_filename": "nvngx_dlssnr.dll",
+  "eyes": ["left", "right"],
+  "observed_regional_contract": {"nr_preset": 0, "ui_correction": 0, "requires_matching_full_route": true},
+  "inherited_environment": ["APPDATA", "LOCALAPPDATA", "USERPROFILE"],
+  "private_environment": ["TEMP", "TMP"],
+  "helper_timeout_ms": 30000,
+  "preload": false,
+  "runtime_bundled_in_engine": false,
+  "private_input_release": "https://github.com/Beren5556/B3VRDLSS/releases/tag/v0.9.8"
+}

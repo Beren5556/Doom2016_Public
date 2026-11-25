@@ -1,0 +1,363 @@
+#include "ShaderCompiler.h"
+#include "DoomLighting.h"
+#include "DoomTemporalGuides.h"
+#include "DoomTemporalAudit.h"
+#include "DoomGeometryAudit.h"
+#include "DoomTemporalResolve.h"
+#include "DoomFinalScene.h"
+#include "DoomTextureFeedback.h"
+#include <spirv_glsl.hpp>
+#include <glslang/Include/glslang_c_interface.h>
+#include <glslang/Public/resource_limits_c.h>
+#include <memory>
+#include <mutex>
+#include <regex>
+#include <stdexcept>
+
+namespace kharvox::sfs {
+namespace {
+using namespace spirv_cross;
+class StereoCompiler final:public CompilerGLSL {
+    bool compute_{};
+    bool computeStage_{};
+    static bool promote(const SPIRType& type){return type.image.dim==spv::Dim2D&&!type.image.arrayed;}
+    std::string eye()const{return computeStage_?(compute_?"khSfsEye":"0"):"gl_ViewIndex";}
+    uint32_t coordinate(uint32_t source,bool integer,const std::string& layer){
+        auto type=expression_type(source);type.vecsize=3;type.basetype=integer?SPIRType::Int:SPIRType::Float;
+        const auto typeId=ir.increase_bound_by(2),id=typeId+1;
+        set<SPIRType>(typeId,type);
+        const auto text=(integer?"ivec3(ivec2(":"vec3(vec2(")+to_expression(source)+"), "+layer+")";
+        set<SPIRExpression>(id,text,typeId,true);
+        inherit_expression_dependencies(id,source);
+        return id;
+    }
+    std::string sampledLayer(const TextureFunctionBaseArguments& args){
+        // A comparison sampler addresses a light's shadow map, not scene
+        // depth. The supplied DOOM profile explicitly keeps this sampling mono.
+        if(args.imgtype->image.depth)return "0";
+        auto image=convert_separate_image_to_expression(args.img);
+        return "min(int("+eye()+"), textureSize("+image+(args.imgtype->image.ms?").z - 1)":", 0).z - 1)");
+    }
+protected:
+    std::string image_type_glsl(const SPIRType& original,uint32_t id,bool member)override{
+        auto type=original;if(promote(type))type.image.arrayed=true;
+        return CompilerGLSL::image_type_glsl(type,id,member);
+    }
+    std::string to_function_name(const TextureFunctionNameArguments& original)override{
+        if(!promote(*original.base.imgtype))return CompilerGLSL::to_function_name(original);
+        if(original.base.is_proj)throw std::runtime_error("SFS: projective image sampling requires explicit conversion");
+        auto args=original;auto type=*args.base.imgtype;type.image.arrayed=true;args.base.imgtype=&type;
+        return CompilerGLSL::to_function_name(args);
+    }
+    std::string to_function_args(const TextureFunctionArguments& original,bool* forward)override{
+        if(!promote(*original.base.imgtype))return CompilerGLSL::to_function_args(original,forward);
+        auto args=original;auto type=*args.base.imgtype;
+        args.coord=coordinate(args.coord,args.base.is_fetch,sampledLayer(args.base));
+        args.coord_components=3;type.image.arrayed=true;args.base.imgtype=&type;
+        return CompilerGLSL::to_function_args(args,forward);
+    }
+    void emit_instruction(const Instruction& instruction)override{
+        const auto op=static_cast<spv::Op>(instruction.op);const auto* words=stream(instruction);
+        // AMD DOOM modules use the legacy Groups vote opcode. SPIRV-Cross
+        // otherwise emits an unimplemented comment and leaves its result ID
+        // undefined. Only subgroup scope maps to GLSL's invocation vote.
+        if(op==spv::OpGroupAll||op==spv::OpGroupAny){
+            if(get_constant(words[2]).scalar()!=spv::ScopeSubgroup)
+                throw std::runtime_error("SFS: legacy group vote requires subgroup scope");
+            emit_unary_func_op(words[0],words[1],words[3],
+                op==spv::OpGroupAll?"allInvocationsARB":"anyInvocationARB");
+            require_extension_internal("GL_ARB_shader_group_vote");
+            register_control_dependent_expression(words[1]);
+            return;
+        }
+        // DOOM's particle module stores an integer-backed buffer flag into a
+        // local bool. Its original driver accepts it; GLSL requires conversion.
+        if(op==spv::OpStore&&expression_type(words[0]).basetype==SPIRType::Boolean&&
+           (expression_type(words[1]).basetype==SPIRType::UInt||expression_type(words[1]).basetype==SPIRType::Int)){
+            auto type=expression_type(words[1]);const bool unsignedValue=type.basetype==SPIRType::UInt;
+            type.basetype=SPIRType::Boolean;
+            if(type.vecsize!=1)throw std::runtime_error("SFS: unsupported vector boolean store");
+            auto ids=ir.increase_bound_by(2);set<SPIRType>(ids,type);
+            set<SPIRExpression>(ids+1,"("+to_expression(words[1])+(unsignedValue?" != 0u)":" != 0)"),ids,true);
+            inherit_expression_dependencies(ids+1,words[1]);
+            EmbeddedInstruction copy;copy.op=instruction.op;copy.count=instruction.count;copy.length=instruction.length;
+            for(uint32_t j=0;j<instruction.length;++j)copy.ops.push_back(words[j]);copy.ops[1]=ids+1;
+            CompilerGLSL::emit_instruction(copy);return;
+        }
+        const bool read=op==spv::OpImageRead,write=op==spv::OpImageWrite;
+        if((read||write)&&promote(expression_type(words[write?0:2]))){
+            EmbeddedInstruction copy;copy.op=instruction.op;copy.count=instruction.count;copy.length=instruction.length;
+            for(uint32_t j=0;j<instruction.length;++j)copy.ops.push_back(words[j]);
+            auto image=to_non_uniform_aware_expression(words[write?0:2]);
+            auto index=write?1:3;
+            copy.ops[index]=coordinate(words[index],true,"min(int("+eye()+"), imageSize("+image+").z - 1)");
+            CompilerGLSL::emit_instruction(copy);return;
+        }
+        CompilerGLSL::emit_instruction(instruction);
+        if((op==spv::OpImageQuerySize||op==spv::OpImageQuerySizeLod)&&promote(expression_type(words[2])))
+            get<SPIRExpression>(words[1]).expression="("+get<SPIRExpression>(words[1]).expression+").xy";
+    }
+    std::string builtin_to_glsl(spv::BuiltIn builtin,spv::StorageClass storage)override{
+        if(compute_){
+            if(builtin==spv::BuiltInGlobalInvocationId)return "khSfsGlobalInvocationID";
+            if(builtin==spv::BuiltInWorkgroupId)return "khSfsWorkGroupID";
+            if(builtin==spv::BuiltInNumWorkgroups)return "khSfsNumWorkGroups";
+        }
+        return CompilerGLSL::builtin_to_glsl(builtin,storage);
+    }
+public:
+    StereoCompiler(const std::vector<uint32_t>& words,bool compute):CompilerGLSL(words),compute_(compute),computeStage_(get_execution_model()==spv::ExecutionModelGLCompute){}
+};
+}
+
+CompiledShader compileStereoShader(const std::vector<uint32_t>& original,const ShaderCompileOptions& request){
+    if(request.indirectEye < -1 || request.indirectEye > 1 ||
+       (request.indirectEye>=0&&(!request.computeStereo||request.profileReplacement)))
+        throw std::runtime_error("SFS: unsupported indirect eye compilation policy");
+    static std::once_flag initialization;
+    std::call_once(initialization,[]{if(!glslang_initialize_process())throw std::runtime_error("glslang initialization failed");});
+    StereoCompiler compiler(original,request.computeStereo);
+    auto options=compiler.get_common_options();options.version=450;options.vulkan_semantics=true;
+    compiler.set_common_options(options);
+    const auto model=compiler.get_execution_model();
+    if(model!=spv::ExecutionModelVertex&&model!=spv::ExecutionModelFragment&&model!=spv::ExecutionModelGLCompute)
+        throw std::runtime_error("SFS: unsupported shader stage");
+    if(request.computeStereo!=(model==spv::ExecutionModelGLCompute)&&request.computeStereo)
+        throw std::runtime_error("SFS: compute transformation requested for graphics shader");
+    auto resources=compiler.get_shader_resources();CompiledShader result;
+    // Driver-specific modules have different byte hashes. Recognize the
+    // constrained DOOM UI vertex layout through reflected inputs/constants.
+    bool uiPosition=false,uiInputs=true,uiMatrix=false;
+    for(const auto& in:resources.stage_inputs){
+        const auto location=compiler.get_decoration(in.id,spv::DecorationLocation);
+        const auto& type=compiler.get_type(in.type_id);
+        if(location==0)uiPosition=type.basetype==SPIRType::Float&&type.vecsize==4;
+        else if(!((location==1&&type.vecsize==2)||(location==3&&type.vecsize==4)
+            ||(location==9&&type.vecsize==4)))uiInputs=false;
+    }
+    for(const auto& buffer:resources.uniform_buffers){
+        if(compiler.get_decoration(buffer.id,spv::DecorationDescriptorSet)!=0
+            ||compiler.get_decoration(buffer.id,spv::DecorationBinding)!=0)continue;
+        const auto& type=compiler.get_type(buffer.base_type_id);
+        if(type.member_types.size()!=4&&type.member_types.size()!=5)continue;
+        const char* names[]{"mvpmatrixx","mvpmatrixy","mvpmatrixz","mvpmatrixw","fontfxdegamma"};
+        bool matches=true;
+        for(uint32_t i=0;i<type.member_types.size();++i){const auto& field=compiler.get_type(type.member_types[i]);
+            matches&=compiler.get_member_name(buffer.base_type_id,i)==names[i]
+                &&field.basetype==SPIRType::Float&&field.vecsize==4&&field.columns==1&&field.array.empty();}
+        uiMatrix|=matches;
+    }
+    const bool semanticUi=model==spv::ExecutionModelVertex&&uiPosition&&uiInputs&&uiMatrix;
+    auto bindings=[&](const auto& list,bool storage){for(const auto& resource:list){const auto& type=compiler.get_type(resource.type_id);
+        if(type.image.dim==spv::Dim2D&&!type.image.arrayed)result.arrayBindings.push_back({compiler.get_decoration(resource.id,spv::DecorationDescriptorSet),compiler.get_decoration(resource.id,spv::DecorationBinding),storage,type.image.depth});}};
+    bindings(resources.sampled_images,false);bindings(resources.separate_images,false);bindings(resources.storage_images,true);
+    auto source=compiler.compile();
+    if(request.textureFeedback&&model==spv::ExecutionModelFragment)
+        result.textureFeedbackCorrections=correctDoomTextureFeedback(source);
+    // The profile's virtual-material atlas pass writes atlas coordinates to
+    // gl_Position and uses MVP only for a varying. A declared mvpmatrixw alone
+    // must not shift the atlas. Recognize the same semantic form on other GPUs.
+    const bool atlasPosition=source.find("vec2 atlasTilePos = vec2(in_VmtrTC.x, in_VmtrTC.y);")!=std::string::npos &&
+        source.find("gl_Position = vec4((atlasTilePos * 2.0) - vec2(1.0), 0.0, 1.0);")!=std::string::npos;
+    const bool vertexProjection=request.vertexProjection&&!atlasPosition&&!request.monoscopicView;
+    result.vertexProjectionApplied=vertexProjection;
+    // Captured DOOM dynamic-object velocity VS. Its engine varyings already
+    // contain current no-jitter and previous skinned clip positions, but the
+    // ordinary headset wrapper only transforms gl_Position. Qualify the exact
+    // original module; never infer velocity semantics from varying names alone.
+    const auto objectHash=profileHash(original.data(),uint32_t(original.size()*4));
+    const bool opaqueMotion=objectHash==0xd271df747727c7efULL;
+    const std::string motionCurrent=opaqueMotion?"vofi_TexCoord0":"vofi_TexCoord1";
+    const std::string motionPrevious=opaqueMotion?"vofi_TexCoord1":"vofi_TexCoord2";
+    result.objectMotionApplied=vertexProjection&&model==spv::ExecutionModelVertex&&
+        !request.profileReplacement&&(objectHash==0xc72e22537cca7eedULL||opaqueMotion);
+    if(result.objectMotionApplied){
+        for(const auto& anchor:{motionCurrent+" = posNoJitter;",motionPrevious+" = posLast;",
+            std::string("gl_Position.y = -gl_Position.y;"),std::string(".mvpmatrixnojitterw"),std::string(".mvpmatrixlastw")})
+            if(source.find(anchor)==std::string::npos)throw std::runtime_error("Unrecognized object motion varying contract");
+    }
+    // The 5d8a profile family also contains packed, virtual-textured world
+    // geometry. Its near-camera depth pass must retain IPD even below the HUD
+    // clip-W threshold, or depth and material coverage diverge underfoot.
+    const bool packedWorld=source.find(".vertexxyzscale")!=std::string::npos&&
+        source.find("in_VmtrTC")!=std::string::npos;
+    result.screenSpaceUiApplied=vertexProjection&&(request.screenSpaceUi||semanticUi)&&!packedWorld;
+    // Reconstruct the profile's horizontal clip correction in affine form.
+    // stereo.z is KHARVOX's intercept. Also correct the two supplied fog variants
+    // which subtract stereo.x rather than the convergence field in that term.
+    static const std::regex displacement(R"(([A-Za-z_]\w*\.vk3d_params\[[^\]]+\]\.stereo)\.x \* \(([^()\n]+) - \1\.[xy]\))");
+    source=std::regex_replace(source,displacement,"($1.x * ($2) + $1.z)");
+    LightingCorrections lighting;
+    if(!request.monoscopicView&&(model==spv::ExecutionModelFragment || (model==spv::ExecutionModelGLCompute &&
+       (request.computeStereo || (request.profileReplacement && hasStereoStorageOutput(original))))))
+        lighting=correctDoomLighting(source);
+    result.clusterCorrections=lighting.clusters;result.worldCorrections=lighting.worldPositions;
+    result.refractionCorrections=lighting.refractions;
+    result.temporalCorrections=lighting.temporal;
+    result.ssdoCorrections=lighting.ssdo;
+    result.ssrCorrections=lighting.ssr;
+    result.particleCollisionApplied=!request.monoscopicView&&model==spv::ExecutionModelGLCompute&&
+        !request.computeStereo&&correctDoomParticleCollision(source);
+    const auto versionEnd=source.find('\n');
+    std::string prefix;
+    if(model!=spv::ExecutionModelGLCompute)prefix="#extension GL_EXT_multiview : require\n";
+    if(request.computeStereo)prefix+="uint khSfsEye;\nuvec3 khSfsGlobalInvocationID, khSfsWorkGroupID, khSfsNumWorkGroups;\n";
+    if(vertexProjection||lighting.clusters||lighting.worldPositions||lighting.refractions||lighting.ssdo||lighting.ssr||result.particleCollisionApplied){
+        for(const auto& u:resources.uniform_buffers)if(compiler.get_decoration(u.id,spv::DecorationDescriptorSet)==0&&compiler.get_decoration(u.id,spv::DecorationBinding)==31)
+            throw std::runtime_error("SFS: projection descriptor binding collision");
+        prefix+="layout(set=0,binding=31,std140) uniform KharvoxStereoProjection { layout(offset=64) mat4 clipFromCenter[2]; vec4 eyeTranslation[2]; mat4 previousClipFromCenter[2]; vec4 previousEyeTranslation[2]; } khSfsProjection;\n";
+        if(lighting.clusters||lighting.worldPositions||lighting.refractions||lighting.ssdo||lighting.ssr)prefix+=lightingProjectionHelper(model!=spv::ExecutionModelGLCompute?"gl_ViewIndex":request.computeStereo?"khSfsEye":"gl_WorkGroupID.z / (gl_NumWorkGroups.z / 2u)");
+    }
+    if(vertexProjection){
+        if(model!=spv::ExecutionModelVertex)throw std::runtime_error("SFS: projection requires a vertex shader");
+        // Profile shaders use fixed-display separation/convergence here. The
+        // headset transform replaces those position adjustments, retaining all
+        // other shader-specific corrections and mono shadow replacements.
+        size_t line=0;
+        while(line<source.size()){
+            auto end=source.find('\n',line);if(end==std::string::npos)end=source.size();
+            const auto text=source.substr(line,end-line);
+            if((text.find("gl_Position.x +=")!=std::string::npos||text.find("gl_Position.x -=")!=std::string::npos)
+                &&text.find(".stereo.")!=std::string::npos)source.erase(line,end-line);
+            else line=end;
+            if(line<source.size())++line;
+        }
+    }
+    // Put declarations after all #extension lines, which must precede declarations.
+    source.insert(versionEnd+1,model!=spv::ExecutionModelGLCompute?"#extension GL_EXT_multiview : require\n":"");
+    if(model!=spv::ExecutionModelGLCompute)prefix.erase(0,prefix.find('\n')+1);
+    auto declaration=source.find("\n\n");if(declaration==std::string::npos)declaration=source.find('\n');
+    source.insert(declaration+1,prefix);
+    if(request.computeStereo||vertexProjection){
+        const auto main=source.find("void main()");if(main==std::string::npos)throw std::runtime_error("SFS: missing GLSL entry point");
+        source.replace(main,11,"void khSfsOriginalMain()");
+        source+="\nvoid main() {\n";
+        if(request.computeStereo){
+            if(request.indirectEye>=0)source+="khSfsNumWorkGroups = gl_NumWorkGroups;\nkhSfsEye = "+std::to_string(request.indirectEye)+"u;\nkhSfsWorkGroupID = gl_WorkGroupID;\nkhSfsGlobalInvocationID = gl_GlobalInvocationID;\n";
+            else source+="khSfsNumWorkGroups = gl_NumWorkGroups; khSfsNumWorkGroups.z /= 2u;\nkhSfsEye = gl_WorkGroupID.z / khSfsNumWorkGroups.z;\nkhSfsWorkGroupID = gl_WorkGroupID; khSfsWorkGroupID.z %= khSfsNumWorkGroups.z;\nkhSfsGlobalInvocationID = gl_GlobalInvocationID; khSfsGlobalInvocationID.z -= khSfsEye * khSfsNumWorkGroups.z * gl_WorkGroupSize.z;\n";
+        }
+        source+="khSfsOriginalMain();\n";
+        if(vertexProjection){
+            // Screen UI has no metric depth for IPD, but still needs the HMD's
+            // asymmetric FOV transform. Equal clip coordinates in both eyes
+            // are different viewing rays and cause binocular double images.
+            source+="gl_Position = khSfsProjection.clipFromCenter[gl_ViewIndex] * gl_Position;\n";
+            if(result.screenSpaceUiApplied){
+                // Perspective HUD has a spatial clip-W row even at short depth.
+                // Classify it per draw, not per vertex: an arm panel must not
+                // switch stereo off as individual corners cross the old band.
+                std::smatch metricRow;
+                static const std::regex row(R"((\b[A-Za-z_]\w*\.mvpmatrixw)\b)");
+                if(std::regex_search(source,metricRow,row)){
+                    const auto w=metricRow[1].str();
+                    source+="if (dot("+w+".xyz, "+w+".xyz) > 0.00000001 || gl_Position.w > 8.0) ";
+                } else source+="if (gl_Position.w > 8.0) ";
+            }
+            source+="gl_Position += khSfsProjection.eyeTranslation[gl_ViewIndex];\n";
+            if(result.objectMotionApplied){
+                // Varyings are still in the engine's pre-Vulkan Y convention.
+                // Transform in Vulkan clip space, then undo that flip because
+                // the original fragment shader flips Y when producing UVs.
+                source+="vec4 khMotionCurrent = "+motionCurrent+"; khMotionCurrent.y = -khMotionCurrent.y;\n"
+                    "khMotionCurrent = khSfsProjection.clipFromCenter[gl_ViewIndex] * khMotionCurrent + khSfsProjection.eyeTranslation[gl_ViewIndex];\n"
+                    "khMotionCurrent.y = -khMotionCurrent.y; "+motionCurrent+" = khMotionCurrent;\n"
+                    "vec4 khMotionPrevious = "+motionPrevious+"; khMotionPrevious.y = -khMotionPrevious.y;\n"
+                    "khMotionPrevious = khSfsProjection.previousClipFromCenter[gl_ViewIndex] * khMotionPrevious + khSfsProjection.previousEyeTranslation[gl_ViewIndex];\n"
+                    "khMotionPrevious.y = -khMotionPrevious.y; "+motionPrevious+" = khMotionPrevious;\n";
+            }
+        }
+        source+="}\n";
+    }
+    if(unsigned(request.temporalGuides)+unsigned(request.temporalAudit)+unsigned(request.temporalResolve)+unsigned(request.geometryAudit)+unsigned(request.finalSceneCopy)+unsigned(request.finalSceneResolve)>1)
+        throw std::runtime_error("Private temporal shader variants are mutually exclusive");
+    if(request.finalSceneCopy||request.finalSceneResolve){
+        if(model!=spv::ExecutionModelFragment||request.monoscopicView)throw std::runtime_error("Final scene requires stereo fragment");
+        makeDoomFinalScene(source,request.finalSceneCopy);
+    }
+    if(request.temporalResolve){
+        if(!request.profileReplacement||model!=spv::ExecutionModelFragment||request.monoscopicView)
+            throw std::runtime_error("Temporal resolve requires the recognized stereo fragment profile");
+        makeDoomTemporalResolve(source,result.temporalCorrections);
+        result.temporalResolveApplied=true;
+    }
+    if(request.temporalGuides){
+        if(model!=spv::ExecutionModelFragment||request.monoscopicView)
+            throw std::runtime_error("Temporal guides require a stereo fragment shader");
+        makeDoomTemporalGuides(source,result.temporalCorrections,request.temporalColor);
+        result.temporalGuidesApplied=true;
+    }
+    if(request.temporalColor&&!request.temporalGuides)throw std::runtime_error("Temporal color requires private guides");
+    if(request.temporalAudit){
+        if(request.temporalGuides||model!=spv::ExecutionModelFragment||request.monoscopicView)
+            throw std::runtime_error("Temporal audit requires the original stereo fragment resolve");
+        makeDoomTemporalAudit(source,result.temporalCorrections);
+        result.temporalAuditApplied=true;
+    }
+    if(request.geometryAudit){
+        const auto inputHash=profileHash(original.data(),uint32_t(original.size()*4));
+        if(model!=spv::ExecutionModelVertex||request.monoscopicView||!vertexProjection||
+           inputHash!=(request.profileReplacement?doomGeometryAuditProfileHash:doomGeometryAuditHash))
+            throw std::runtime_error("Geometry audit requires a fingerprinted original/profile stereo vertex shader");
+        makeDoomGeometryAudit(source,inputHash);result.geometryAuditApplied=true;
+    }
+    result.glsl=source;
+    glslang_input_t input{};input.language=GLSLANG_SOURCE_GLSL;
+    input.stage=model==spv::ExecutionModelVertex?GLSLANG_STAGE_VERTEX:model==spv::ExecutionModelFragment?GLSLANG_STAGE_FRAGMENT:GLSLANG_STAGE_COMPUTE;
+    input.client=GLSLANG_CLIENT_VULKAN;input.client_version=GLSLANG_TARGET_VULKAN_1_1;
+    input.target_language=GLSLANG_TARGET_SPV;input.target_language_version=GLSLANG_TARGET_SPV_1_3;
+    input.code=source.c_str();input.default_version=450;input.default_profile=GLSLANG_NO_PROFILE;
+    input.messages=static_cast<glslang_messages_t>(GLSLANG_MSG_SPV_RULES_BIT|GLSLANG_MSG_VULKAN_RULES_BIT);input.resource=glslang_default_resource();
+    std::unique_ptr<glslang_shader_t,decltype(&glslang_shader_delete)> shader(glslang_shader_create(&input),glslang_shader_delete);
+    if(!shader)throw std::runtime_error("SFS: shader allocation failed");
+    if(!glslang_shader_preprocess(shader.get(),&input)||!glslang_shader_parse(shader.get(),&input))
+        throw std::runtime_error(std::string("SFS shader compile: ")+glslang_shader_get_info_log(shader.get())+"\n"+source);
+    std::unique_ptr<glslang_program_t,decltype(&glslang_program_delete)> program(glslang_program_create(),glslang_program_delete);
+    if(!program)throw std::runtime_error("SFS: program allocation failed");
+    glslang_program_add_shader(program.get(),shader.get());
+    if(!glslang_program_link(program.get(),input.messages))throw std::runtime_error(glslang_program_get_info_log(program.get()));
+    glslang_program_SPIRV_generate(program.get(),input.stage);
+    const auto size=glslang_program_SPIRV_get_size(program.get());if(!size)throw std::runtime_error("SFS: SPIR-V generation failed");
+    result.words.resize(size);glslang_program_SPIRV_get(program.get(),result.words.data());
+    return result;
+}
+bool hasStereoStorageOutput(const std::vector<uint32_t>& original){
+    spirv_cross::Compiler compiler(original);
+    if(compiler.get_execution_model()!=spv::ExecutionModelGLCompute)return false;
+    for(const auto& image:compiler.get_shader_resources().storage_images)
+        if(compiler.get_type(image.type_id).image.dim==spv::Dim2D&&!compiler.has_decoration(image.id,spv::DecorationNonWritable))return true;
+    return false;
+}
+bool needsHeadsetProjection(const std::vector<uint32_t>& words,bool profileReplacement,bool shadowPass){
+    // A TV profile may intentionally remove separation from UI/mask geometry.
+    // No active stereo UBO does not imply that its centered MVP already uses
+    // the headset FOV. Keep explicit stereo exceptions in biased passes, but
+    // never apply this fallback to an unshifted shared shadow-map shader.
+    if(profileReplacement&&needsStereoProjection(words,true))return true;
+    return !shadowPass&&needsStereoProjection(words,false);
+}
+bool needsStereoProjection(const std::vector<uint32_t>& original,bool profileReplacement){
+    spirv_cross::Compiler compiler(original);
+    if(compiler.get_execution_model()!=spv::ExecutionModelVertex)return false;
+    for(const auto& buffer:compiler.get_shader_resources().uniform_buffers){
+        if(profileReplacement){if(compiler.get_decoration(buffer.id,spv::DecorationDescriptorSet)==0&&compiler.get_decoration(buffer.id,spv::DecorationBinding)==30&&!compiler.get_active_buffer_ranges(buffer.id).empty())return true;}
+        else {
+            const auto& type=compiler.get_type(buffer.base_type_id);
+            bool view=false,projection=false,viewProjection=false;
+            const auto active=compiler.get_active_buffer_ranges(buffer.id);
+            for(uint32_t i=0;i<type.member_types.size();++i){
+                const auto name=compiler.get_member_name(buffer.base_type_id,i);
+                bool used=false;for(const auto& range:active)used|=range.index==i;
+                if(!used)continue;
+                if(name=="mvpmatrixw")return true;
+                view|=name=="viewmatrixw";
+                projection|=name=="projectionmatrixw";
+                viewProjection|=name=="viewprojectionmatrixw";
+            }
+            // GPU particles assemble view and projection separately; distant
+            // world geometry can use VP directly. Both still need per-eye clip.
+            if(viewProjection||(view&&projection))return true;
+        }
+    }
+    return false;
+}
+}
